@@ -1,0 +1,12 @@
+[project]
+name = "fthreads"
+version = "0.1.0"
+description = "A minimal exploration of free threading in Python for MapReduce paradigm"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+authors = [
+  {name = "Mario Reyes Ojeda", email = "mfreyesojeda@gmail.com"}
+]
+[dependency-groups]
+dev = ["ty>=0.0.1a7", "pytest>=8"]
