@@ -3,6 +3,7 @@
 import argparse
 import logging
 import random
+import threading
 import urllib.request
 from pathlib import Path
 
@@ -19,6 +20,8 @@ GUTENBERG_URLS: list[str] = [
     "https://www.gutenberg.org/files/1342/1342-0.txt",  # Pride and Prejudice
     "https://www.gutenberg.org/files/84/84-0.txt",  # Frankenstein
 ]
+
+SEED: int = 42
 
 
 def _url_to_cache_path(url: str) -> Path:
@@ -73,12 +76,25 @@ def main() -> None:
     args: argparse.Namespace = parser.parse_args()
     min_words, max_words = args.chunk_size
 
+    random.seed(SEED)
     corpus: list[str] = fetch_corpus(GUTENBERG_URLS)
 
-    for i in range(args.n):
-        chunk: list[str] = random_chunk(corpus, min_words, max_words)
+    chunks: list[list[str]] = [
+        random_chunk(corpus, min_words, max_words) for _ in range(args.n)
+    ]
+
+    def send_request(i: int, chunk: list[str]) -> None:
         logger.info(f"Request {i + 1}/{args.n}: sending {len(chunk)} words")
         do_request(my_funs, chunk)
+
+    threads: list[threading.Thread] = [
+        threading.Thread(target=send_request, args=(i, c))
+        for i, c in enumerate(chunks)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
 
     logger.info("All requests completed")
 

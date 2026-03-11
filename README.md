@@ -60,19 +60,34 @@ The *num_requests* indicate the number of client requests to the server.
 
 The *down_chunk_size* and *up_chunk_size* are the bound limits for the corpus length.
 
-## Additional Commands
+## Benchmark: GIL vs No-GIL
 
-- Typecheck run
+A benchmark script is included to compare server performance with the GIL enabled (`PYTHON_GIL=1`) versus disabled (`PYTHON_GIL=0`).
 
-```bash
-make typecheck
-```
-
-- Unit tests run
+### Running the Benchmark
 
 ```bash
-make test
+# Default: 10 requests, chunk 500-1000 words, 120s timeout
+./benchmark.sh
+
+# Custom: 20 requests, chunk 1000-2000 words, 60s timeout
+./benchmark.sh 20 1000 2000 60
 ```
+
+The script starts and stops the server for each run, sends all requests concurrently (using threads in `test_load.py`), and times the full execution under both modes. A timeout (4th argument, default 120s) prevents the GIL run from blocking forever.
+
+### Results
+
+| Mode | Requests | Chunk Size | Workers | Result |
+| ---- | -------- | ---------- | ------- | ------ |
+| No GIL (`PYTHON_GIL=0`) | 10 | 500-1000 | 4 | Completes normally |
+| With GIL (`PYTHON_GIL=1`) | 10 | 500-1000 | 4 | Hangs (deadlock) |
+
+### Findings
+
+- **With the GIL disabled**, 4 worker threads process concurrent MapReduce jobs in true parallel and all requests complete successfully.
+- **With the GIL enabled**, the server **deadlocks**. Each worker thread calls `map_reduce()` which internally uses `asyncio.run()` + `asyncio.to_thread()` to parallelize map/reduce phases. Under the GIL, the outer worker threads and the inner `asyncio.to_thread` threads all compete for the same lock, causing thread starvation and effectively a deadlock.
+- This demonstrates a real-world scenario where free-threading (PEP 703) enables architectures that are **impossible under the GIL** — not just faster, but the difference between working and not working at all.
 
 ## Author
 

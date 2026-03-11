@@ -3,7 +3,6 @@ from collections.abc import Iterable
 from functools import partial
 import logging
 import marshal
-import multiprocessing as mp
 import pickle
 from queue import Empty, Queue
 import signal
@@ -77,6 +76,9 @@ async def accept_requests(
     job_id: list[int] = [0],
 ) -> None:
     op: bytes = await reader.read(1)
+    if not op:
+        writer.close()
+        return
     if op[0] == 0:
         await submit_job(job_id[0], reader, writer)
         job_id[0] += 1
@@ -109,6 +111,9 @@ def init_worker() -> None:
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
+NUM_WORKERS: int = 4
+
+
 async def main() -> None:
     server: asyncio.Server = await asyncio.start_server(
         accept_requests, "127.0.0.1", 1936
@@ -119,8 +124,12 @@ async def main() -> None:
         signal.SIGINT, partial(handle_interrupt_signal, server=server)
     )
 
-    worker_thread: threading.Thread = threading.Thread(target=partial(worker))
-    worker_thread.start()
+    workers: list[threading.Thread] = [
+        threading.Thread(target=worker, name=f"worker-{i}")
+        for i in range(NUM_WORKERS)
+    ]
+    for w in workers:
+        w.start()
 
     async with server:
         try:
@@ -128,8 +137,10 @@ async def main() -> None:
         except asyncio.exceptions.CancelledError:
             logger.warning("Server cancelled")
 
-    work_queue.put((-1, None, None))
-    worker_thread.join()
+    for _ in workers:
+        work_queue.put((-1, None, None))
+    for w in workers:
+        w.join()
 
     logger.info("graceful exit")
 
