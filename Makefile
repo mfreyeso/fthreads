@@ -1,7 +1,7 @@
 .PHONY: typecheck test
 
 typecheck:
-	uv ty check .
+	uv run ty check .
 
 test:
 	uv run pytest -v

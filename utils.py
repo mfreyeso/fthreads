@@ -1,3 +1,4 @@
+from itertools import islice
 import asyncio
 from collections import defaultdict
 from collections.abc import Callable, Generator, Iterable, Sequence
@@ -6,20 +7,10 @@ import types
 from typing import cast
 
 
-def chunk0[T](my_list: list[T], chunk_size: int) -> Generator[list[T]]:
-    for i in range(0, len(my_list), chunk_size):
-        yield my_list[i : i + chunk_size]
-
-
 def chunk[T](my_iter: Iterable[T], chunk_size: int) -> Generator[list[T]]:
-    chunk_list: list[T] = []
-    for elem in my_iter:
-        chunk_list.append(elem)
-        if len(chunk_list) == chunk_size:
-            yield chunk_list
-            chunk_list = []
-    if len(chunk_list) > 0:
-        yield chunk_list
+    it = iter(my_iter)
+    while batch := list(islice(it, chunk_size)):
+        yield batch
 
 
 def chunk_runner(fun_marshal: bytes, data: Sequence[object]) -> list[object]:
